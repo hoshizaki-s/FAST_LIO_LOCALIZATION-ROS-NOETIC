@@ -25,9 +25,14 @@
 
     <!-- glbal map-->
     <node pkg="pcl_ros" type="pcd_to_pointcloud" name="map_publishe" output="screen"
-          args="$(arg map) 5 _frame_id:=map cloud_pcd:=/map" />
+          args="$(arg map) 5 _frame_id:=map cloud_pcd:=/map_pcd" />
 
-    <node pkg="fast_lio_localization" type="map_odom_broadcaster.py" name="map_odom_broadcaster" output="screen"/>
+    <!-- wait_for_clockを使用してクロックの同期を待つ
+    <node pkg="fast_lio_localization" type="map_odom_broadcaster.py" 
+          name="map_odom_broadcaster" output="screen"
+          launch-prefix="bash -c 'sleep 5; $0 $@'"> 
+        <param name="wait_for_clock" value="true"/>
+    </node> -->
 
     <group if="$(arg rviz)">
       <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find fast_lio_localization)/rviz_cfg/localization.rviz" />

@@ -12,9 +12,13 @@ class MapOdomBroadcaster:
     def __init__(self):
         rospy.init_node('map_odom_broadcaster')
         
-        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_buffer = tf2_ros.Buffer(rospy.Duration(10.0))  # バッファ時間を10秒に増加
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
         self.br = tf.TransformBroadcaster()
+        
+        # 前回の有効な変換を保存
+        self.last_valid_translation = None
+        self.last_valid_quaternion = None
         
         self.timer = rospy.Timer(rospy.Duration(0.02), self.publish_transform)
 
@@ -23,32 +27,37 @@ class MapOdomBroadcaster:
         trans = transform.transform.translation
         rot = transform.transform.rotation
         
-        # クォータニオンから回転行列を作成
         matrix = tft.quaternion_matrix([rot.x, rot.y, rot.z, rot.w])
-        # 並進を設定
         matrix[0:3, 3] = [trans.x, trans.y, trans.z]
         return matrix
 
     def matrix_to_transform_msgs(self, matrix):
         """Homogeneous transformation matrixから並進とクォータニオンを取得"""
-        # 回転行列からクォータニオンを取得
         quaternion = tft.quaternion_from_matrix(matrix)
-        # 並進を取得
         translation = matrix[0:3, 3].tolist()
         return translation, quaternion
 
     def publish_transform(self, event=None):
         try:
-            # 各変換を取得
+            # 現在時刻を取得
+            now = rospy.Time.now()
+            
+            # 少し前の時刻でTF取得を試みる（センサーの遅延を考慮）
+            transform_time = now - rospy.Duration(0.1)
+            
+            # 各変換を取得（タイムアウト付き）
             map_to_body = self.tf_buffer.lookup_transform(
-                "camera_init",
+                "map",
                 "body",
-                rospy.Time(0)
+                transform_time,
+                rospy.Duration(0.5)  # タイムアウトを0.5秒に設定
             )
+            
             odom_to_footprint = self.tf_buffer.lookup_transform(
                 "odom",
                 "base_footprint",
-                rospy.Time(0)
+                transform_time,
+                rospy.Duration(0.5)
             )
 
             # 各変換を行列に変換
@@ -56,8 +65,6 @@ class MapOdomBroadcaster:
             T_odom_footprint = self.transform_to_matrix(odom_to_footprint)
 
             # map->odomの変換を計算
-            # T_map_odom = T_map_body * T_body_footprint * T_footprint_odom
-            # ここでT_body_footprintは単位行列と仮定（bodyとfootprintは同じと考える）
             T_footprint_odom = np.linalg.inv(T_odom_footprint)
             T_map_odom = np.dot(T_map_body, T_footprint_odom)
 
@@ -68,7 +75,7 @@ class MapOdomBroadcaster:
             self.br.sendTransform(
                 translation,
                 quaternion,
-                rospy.Time.now(),
+                now,  # 現在時刻を使用
                 "odom",
                 "map"
             )
