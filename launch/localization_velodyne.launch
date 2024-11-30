@@ -16,7 +16,7 @@
     <param name="pcd_save_enable" type="bool" value="0" />
     <node pkg="fast_lio_localization" type="fastlio_mapping" name="laserMapping" output="screen" />
 
-    <arg name="map" default="$(find fast_lio_localization)/PCD/scans.pcd" />
+    <arg name="map" default="$(find fast_lio_localization)/PCD/map.pcd" />
     <!-- loalization-->
     <node pkg="fast_lio_localization" type="global_localization.py" name="global_localization" output="screen" />
 
@@ -26,9 +26,13 @@
     <!-- glbal map-->
     <node pkg="pcl_ros" type="pcd_to_pointcloud" name="map_publishe" output="screen"
           args="$(arg map) 5 _frame_id:=map cloud_pcd:=/map_pcd" />
+      
+    <!-- Static Transform Publisher -->
+    <node pkg="tf" type="static_transform_publisher" name="map_to_base_footprint"
+        args="0.0 0.0 0 0 0 0 body base_footprint 100" />
 
-    <!-- wait_for_clockを使用してクロックの同期を待つ
-    <node pkg="fast_lio_localization" type="map_odom_broadcaster.py" 
+    <!-- wait_for_clockを使用してクロックの同期を待つ -->
+    <!-- <node pkg="fast_lio_localization" type="map_odom_broadcaster.py" 
           name="map_odom_broadcaster" output="screen"
           launch-prefix="bash -c 'sleep 5; $0 $@'"> 
         <param name="wait_for_clock" value="true"/>
